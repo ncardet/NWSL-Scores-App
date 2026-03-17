@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { addDays, subDays, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { addDays, subDays, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameWeek } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
 import { useSchedule } from '@/hooks/useSchedule';
 import { MatchdayGroup } from './MatchdayGroup';
@@ -67,6 +67,16 @@ export function SchedulePage({ initialGames, initialStartDate, initialEndDate }:
     return '2026 Season';
   }, [viewMode, anchorDate]);
 
+  const today = new Date();
+  const isThisWeek = viewMode === 'week' && isSameWeek(anchorDate, today, { weekStartsOn: 1 });
+  const isThisMonth = viewMode === 'month' && anchorDate.getMonth() === today.getMonth() && anchorDate.getFullYear() === today.getFullYear();
+  const showThisWeekBtn = !isThisWeek && viewMode === 'week' || !isThisMonth && viewMode === 'month';
+
+  const goToToday = () => {
+    setAnchorDate(new Date());
+    if (viewMode === 'season') setViewMode('week');
+  };
+
   const prev = () => {
     if (viewMode === 'week') setAnchorDate((d) => subDays(d, 7));
     else if (viewMode === 'month') setAnchorDate((d) => subDays(startOfMonth(d), 1));
@@ -91,14 +101,27 @@ export function SchedulePage({ initialGames, initialStartDate, initialEndDate }:
 
         {/* Date navigation */}
         {viewMode !== 'season' && (
-          <div className="flex items-center justify-between">
-            <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: '#1C1C1E' }}>
+          <div className="flex items-center justify-between gap-2">
+            <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0" style={{ background: '#1C1C1E' }}>
               <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
                 <path d="M8 2L2 8L8 14" stroke="#8E8E93" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            <span style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 600 }}>{periodLabel}</span>
-            <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: '#1C1C1E' }}>
+
+            <div className="flex items-center gap-2 flex-1 justify-center">
+              <span style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 600 }}>{periodLabel}</span>
+              {showThisWeekBtn && (
+                <button
+                  onClick={goToToday}
+                  className="rounded-full px-2.5 py-1 flex-shrink-0"
+                  style={{ background: '#0A84FF', color: '#FFFFFF', fontSize: 11, fontWeight: 600, lineHeight: 1 }}
+                >
+                  This Week
+                </button>
+              )}
+            </div>
+
+            <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0" style={{ background: '#1C1C1E' }}>
               <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
                 <path d="M2 2L8 8L2 14" stroke="#8E8E93" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -106,7 +129,16 @@ export function SchedulePage({ initialGames, initialStartDate, initialEndDate }:
           </div>
         )}
         {viewMode === 'season' && (
-          <div className="text-center" style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 600 }}>{periodLabel}</div>
+          <div className="flex items-center justify-center gap-2">
+            <span style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 600 }}>{periodLabel}</span>
+            <button
+              onClick={goToToday}
+              className="rounded-full px-2.5 py-1"
+              style={{ background: '#0A84FF', color: '#FFFFFF', fontSize: 11, fontWeight: 600, lineHeight: 1 }}
+            >
+              This Week
+            </button>
+          </div>
         )}
       </div>
 
