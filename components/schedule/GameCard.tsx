@@ -6,7 +6,7 @@ import type { Game } from '@/lib/types';
 import { TeamCrest } from './TeamCrest';
 import { BroadcastList } from './BroadcastBadge';
 import { ExcitementBadge, LiveIndicator } from './ExcitementBadge';
-import { useExcitement } from '@/hooks/useExcitement';
+import { useExcitement, useProjectedExcitement } from '@/hooks/useExcitement';
 
 interface GameCardProps {
   game: Game;
@@ -18,9 +18,15 @@ export function GameCard({ game, showExcitement = true }: GameCardProps) {
   const isLive = game.state === 'in';
   const isPre = game.state === 'pre';
 
-  const { excitement, isLoading } = useExcitement(
+  const { excitement: actualExcitement, isLoading: actualLoading } = useExcitement(
     showExcitement && isPost ? game : null
   );
+  const { excitement: projectedExcitement, isLoading: projectedLoading } = useProjectedExcitement(
+    showExcitement && isPre ? game : null
+  );
+
+  const excitement = isPost ? actualExcitement : projectedExcitement;
+  const isLoading = isPost ? actualLoading : projectedLoading;
 
   const kickoffTime = (() => {
     try {
@@ -47,7 +53,7 @@ export function GameCard({ game, showExcitement = true }: GameCardProps) {
           <div className="w-12 flex-shrink-0 flex justify-center">
             {isLive ? (
               <LiveIndicator />
-            ) : isPost && showExcitement ? (
+            ) : showExcitement ? (
               <ExcitementBadge excitement={excitement} loading={isLoading} />
             ) : null}
           </div>

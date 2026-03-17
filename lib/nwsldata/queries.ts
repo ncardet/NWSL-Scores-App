@@ -64,6 +64,96 @@ export async function getRedCards(gameId: number): Promise<number> {
   return Number(rows[0]?.count ?? 0);
 }
 
+// Get recent H2H games between two teams (up to 10, most recent first)
+export async function getH2HGames(
+  slugA: string,
+  slugB: string
+): Promise<NwslGame[]> {
+  const a = escapeStr(slugA);
+  const b = escapeStr(slugB);
+  const sql = `
+    SELECT game_id, date, home_team_id, away_team_id, home_score, away_score
+    FROM games
+    WHERE (home_team_id = '${a}' AND away_team_id = '${b}')
+       OR (home_team_id = '${b}' AND away_team_id = '${a}')
+    ORDER BY date DESC
+    LIMIT 10
+  `;
+  return runQuery<NwslGame>(sql);
+}
+
+// Batch: goals for multiple game IDs
+export async function getGoalsByGameIds(gameIds: number[]): Promise<NwslGoal[]> {
+  if (!gameIds.length) return [];
+  const sql = `
+    SELECT game_id, team_id, minute, period
+    FROM goals
+    WHERE game_id IN (${gameIds.join(',')})
+    ORDER BY game_id, minute ASC
+  `;
+  return runQuery<NwslGoal>(sql);
+}
+
+// Batch: shots on goal count per game
+export async function getShotsOnGoalBatch(
+  gameIds: number[]
+): Promise<Array<{ game_id: number; count: number }>> {
+  if (!gameIds.length) return [];
+  const sql = `
+    SELECT game_id, COUNT(*) as count
+    FROM shots
+    WHERE game_id IN (${gameIds.join(',')})
+    AND shot_outcome IN ('goal', 'saved', 'blocked')
+    GROUP BY game_id
+  `;
+  return runQuery<{ game_id: number; count: number }>(sql);
+}
+
+// Batch: red cards per game
+export async function getRedCardsBatch(
+  gameIds: number[]
+): Promise<Array<{ game_id: number; count: number }>> {
+  if (!gameIds.length) return [];
+  const sql = `
+    SELECT game_id, COUNT(*) as count
+    FROM game_events
+    WHERE game_id IN (${gameIds.join(',')})
+    AND type IN ('red_card', 'yellow_red_card')
+    GROUP BY game_id
+  `;
+  return runQuery<{ game_id: number; count: number }>(sql);
+}
+
+// A team's average goals scored and conceded over their last N games
+export async function getTeamGoalRate(
+  slug: string,
+  lastN = 10
+): Promise<{ scored: number; conceded: number; games: number }> {
+  const s = escapeStr(slug);
+  const sql = `
+    SELECT
+      SUM(CASE WHEN home_team_id = '${s}' THEN home_score ELSE away_score END) as scored,
+      SUM(CASE WHEN home_team_id = '${s}' THEN away_score ELSE home_score END) as conceded,
+      COUNT(*) as games
+    FROM (
+      SELECT home_team_id, away_team_id, home_score, away_score
+      FROM games
+      WHERE home_team_id = '${s}' OR away_team_id = '${s}'
+      ORDER BY date DESC
+      LIMIT ${lastN}
+    ) recent
+  `;
+  const rows = await runQuery<{ scored: number; conceded: number; games: number }>(sql);
+  const row = rows[0];
+  const games = Number(row?.games ?? 0);
+  if (!games) return { scored: 1.2, conceded: 1.2, games: 0 }; // NWSL league avg fallback
+  return {
+    scored: Number(row.scored) / games,
+    conceded: Number(row.conceded) / games,
+    games,
+  };
+}
+
 function escapeStr(s: string): string {
   return s.replace(/'/g, "''");
 }

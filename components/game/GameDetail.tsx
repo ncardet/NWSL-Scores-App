@@ -7,7 +7,7 @@ import { TeamCrest } from '@/components/schedule/TeamCrest';
 import { BroadcastList } from '@/components/schedule/BroadcastBadge';
 import { ExcitementBreakdown } from './ExcitementBreakdown';
 import { GoalTimeline } from './GoalTimeline';
-import { useExcitement } from '@/hooks/useExcitement';
+import { useExcitement, useProjectedExcitement } from '@/hooks/useExcitement';
 import type { NwslGoal } from '@/lib/nwsldata/types';
 
 interface GameDetailProps {
@@ -18,7 +18,11 @@ interface GameDetailProps {
 export function GameDetail({ game, goals = [] }: GameDetailProps) {
   const isPost = game.state === 'post';
   const isLive = game.state === 'in';
-  const { excitement, isLoading } = useExcitement(isPost ? game : null);
+  const isPre = game.state === 'pre';
+  const { excitement: actualExcitement, isLoading: actualLoading } = useExcitement(isPost ? game : null);
+  const { excitement: projectedExcitement, isLoading: projectedLoading } = useProjectedExcitement(isPre ? game : null);
+  const excitement = isPost ? actualExcitement : projectedExcitement;
+  const isLoading = isPost ? actualLoading : projectedLoading;
 
   const kickoffTime = (() => {
     try {
@@ -100,7 +104,7 @@ export function GameDetail({ game, goals = [] }: GameDetailProps) {
       </div>
 
       {/* Excitement breakdown */}
-      {isPost && (
+      {(isPost || isPre) && (
         isLoading ? (
           <div className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
             <div className="h-4 w-32 bg-gray-100 rounded mb-4" />

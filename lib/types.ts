@@ -47,4 +47,7 @@ export interface ExcitementResult {
   score: number;
   grade: 'Great' | 'Good' | 'OK' | 'Dull';
   breakdown: ExcitementBreakdown;
+  isProjected?: boolean;
+  confidence?: 'high' | 'medium' | 'low'; // only set when isProjected
+  h2hGames?: number; // number of H2H games used in projection
 }
