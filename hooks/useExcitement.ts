@@ -9,20 +9,17 @@ const IMMUTABLE_SWR = {
   revalidateOnFocus: false,
   revalidateOnReconnect: false,
   revalidateIfStale: false,
-  dedupingInterval: 86_400_000,
+  dedupingInterval: 86_400_000, // 24h
 };
 
-// Actual excitement score for completed games
+// Actual excitement score for completed games (ESPN keyEvents + boxscore)
 export function useExcitement(game: Game | null) {
-  const url =
-    game && game.state === 'post' && game.score
-      ? `/api/excitement/${game.espnId}?home=${game.homeTeam.id}&away=${game.awayTeam.id}&date=${encodeURIComponent(game.date)}&homeScore=${game.score.home}&awayScore=${game.score.away}`
-      : null;
+  const url = game && game.state === 'post'
+    ? `/api/excitement/${game.espnId}`
+    : null;
 
   const { data, isLoading } = useSWR<{ excitement: ExcitementResult | null }>(
-    url,
-    fetcher,
-    IMMUTABLE_SWR
+    url, fetcher, IMMUTABLE_SWR
   );
 
   return {
@@ -31,19 +28,16 @@ export function useExcitement(game: Game | null) {
   };
 }
 
-// Projected excitement score for upcoming games
+// Projected excitement score for upcoming games (ESPN season goal rates)
 export function useProjectedExcitement(game: Game | null) {
-  const url =
-    game && game.state === 'pre'
-      ? `/api/excitement/projected?home=${game.homeTeam.id}&away=${game.awayTeam.id}`
-      : null;
+  const url = game && game.state === 'pre'
+    ? `/api/excitement/projected?home=${game.homeTeam.id}&away=${game.awayTeam.id}`
+    : null;
 
   const { data, isLoading } = useSWR<{ excitement: ExcitementResult | null }>(
-    url,
-    fetcher,
-    {
+    url, fetcher, {
       ...IMMUTABLE_SWR,
-      dedupingInterval: 21_600_000, // 6 hours
+      dedupingInterval: 21_600_000, // 6h — team stats change slowly
     }
   );
 
