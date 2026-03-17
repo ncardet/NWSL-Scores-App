@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
@@ -8,9 +8,16 @@ const geist = Geist({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#000000",
+};
+
 export const metadata: Metadata = {
-  title: "NWSL Schedule 2026",
-  description: "National Women's Soccer League 2026 season schedule, scores, and where to watch",
+  title: "NWSL · Scores & Schedule",
+  description: "2026 NWSL season schedule, live scores, and where to watch every game",
 };
 
 export default function RootLayout({
@@ -19,10 +26,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geist.variable} antialiased bg-gray-50 min-h-screen`}>
+    <html lang="en" className="dark">
+      <body className={`${geist.variable} antialiased`} style={{ background: '#000', color: '#fff', minHeight: '100dvh' }}>
         <Header />
-        <main>{children}</main>
+        <main className="pb-safe">
+          {children}
+        </main>
       </body>
     </html>
   );

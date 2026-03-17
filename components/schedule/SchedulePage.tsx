@@ -23,137 +23,108 @@ export function SchedulePage({ initialGames, initialStartDate, initialEndDate }:
 
   const { startDate, endDate } = useMemo(() => {
     if (viewMode === 'week') {
-      const start = startOfWeek(anchorDate, { weekStartsOn: 1 }); // Monday
-      const end = endOfWeek(anchorDate, { weekStartsOn: 1 });
-      return { startDate: format(start, 'yyyy-MM-dd'), endDate: format(end, 'yyyy-MM-dd') };
-    } else if (viewMode === 'month') {
-      const start = startOfMonth(anchorDate);
-      const end = endOfMonth(anchorDate);
-      return { startDate: format(start, 'yyyy-MM-dd'), endDate: format(end, 'yyyy-MM-dd') };
-    } else {
-      // Full season: 2026-03-01 to 2026-11-30
-      return { startDate: '2026-03-01', endDate: '2026-11-30' };
+      const s = startOfWeek(anchorDate, { weekStartsOn: 1 });
+      const e = endOfWeek(anchorDate, { weekStartsOn: 1 });
+      return { startDate: format(s, 'yyyy-MM-dd'), endDate: format(e, 'yyyy-MM-dd') };
     }
+    if (viewMode === 'month') {
+      return { startDate: format(startOfMonth(anchorDate), 'yyyy-MM-dd'), endDate: format(endOfMonth(anchorDate), 'yyyy-MM-dd') };
+    }
+    return { startDate: '2026-03-01', endDate: '2026-11-30' };
   }, [viewMode, anchorDate]);
 
-  // Use SWR for client-side fetching; hydrate with server-rendered initial data
   const isInitialRange = startDate === initialStartDate && endDate === initialEndDate;
-  const { games: fetchedGames, isLoading } = useSchedule(startDate, endDate);
+  const { games: fetched, isLoading } = useSchedule(startDate, endDate);
+  const games = isInitialRange && fetched.length === 0 ? initialGames : fetched;
 
-  const games = isInitialRange && fetchedGames.length === 0 ? initialGames : fetchedGames;
-
-  // Apply filters from URL
   const selectedTeam = searchParams.get('team') ?? '';
   const selectedNetwork = searchParams.get('network') ?? '';
 
-  const filteredGames = useMemo(() => {
-    let result = games;
-    if (selectedTeam) {
-      result = result.filter(
-        (g) => g.homeTeam.id === selectedTeam || g.awayTeam.id === selectedTeam
-      );
-    }
-    if (selectedNetwork) {
-      result = result.filter((g) =>
-        g.broadcasts.some((b) => b.shortName === selectedNetwork)
-      );
-    }
-    return result;
+  const filtered = useMemo(() => {
+    let r = games;
+    if (selectedTeam) r = r.filter((g) => g.homeTeam.id === selectedTeam || g.awayTeam.id === selectedTeam);
+    if (selectedNetwork) r = r.filter((g) => g.broadcasts.some((b) => b.shortName === selectedNetwork));
+    return r;
   }, [games, selectedTeam, selectedNetwork]);
 
-  // Group by date
-  const groupedGames = useMemo(() => {
-    const groups = new Map<string, Game[]>();
-    for (const game of filteredGames) {
-      const dateKey = game.date.slice(0, 10);
-      if (!groups.has(dateKey)) groups.set(dateKey, []);
-      groups.get(dateKey)!.push(game);
+  const grouped = useMemo(() => {
+    const map = new Map<string, Game[]>();
+    for (const g of filtered) {
+      const key = g.date.slice(0, 10);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(g);
     }
-    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredGames]);
-
-  const navigatePrev = () => {
-    if (viewMode === 'week') setAnchorDate((d) => subDays(d, 7));
-    else if (viewMode === 'month') setAnchorDate((d) => subDays(startOfMonth(d), 1));
-  };
-
-  const navigateNext = () => {
-    if (viewMode === 'week') setAnchorDate((d) => addDays(d, 7));
-    else if (viewMode === 'month') {
-      const nextMonth = addDays(endOfMonth(anchorDate), 1);
-      setAnchorDate(nextMonth);
-    }
-  };
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
 
   const periodLabel = useMemo(() => {
     if (viewMode === 'week') {
-      const start = startOfWeek(anchorDate, { weekStartsOn: 1 });
-      const end = endOfWeek(anchorDate, { weekStartsOn: 1 });
-      return `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`;
-    } else if (viewMode === 'month') {
-      return format(anchorDate, 'MMMM yyyy');
+      const s = startOfWeek(anchorDate, { weekStartsOn: 1 });
+      const e = endOfWeek(anchorDate, { weekStartsOn: 1 });
+      return `${format(s, 'MMM d')} – ${format(e, 'MMM d')}`;
     }
+    if (viewMode === 'month') return format(anchorDate, 'MMMM yyyy');
     return '2026 Season';
   }, [viewMode, anchorDate]);
 
+  const prev = () => {
+    if (viewMode === 'week') setAnchorDate((d) => subDays(d, 7));
+    else if (viewMode === 'month') setAnchorDate((d) => subDays(startOfMonth(d), 1));
+  };
+  const next = () => {
+    if (viewMode === 'week') setAnchorDate((d) => addDays(d, 7));
+    else if (viewMode === 'month') setAnchorDate(addDays(endOfMonth(anchorDate), 1));
+  };
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      {/* View mode + navigation */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-          {(['week', 'month', 'season'] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 font-medium capitalize transition-colors ${
-                viewMode === mode
-                  ? 'bg-[#003087] text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {mode}
+    <div className="max-w-2xl mx-auto">
+      {/* Controls */}
+      <div className="sticky top-12 z-30 px-4 pt-3 pb-2" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+        {/* Segmented view toggle */}
+        <div className="seg-control mb-3">
+          {(['week', 'month', 'season'] as ViewMode[]).map((m) => (
+            <button key={m} onClick={() => setViewMode(m)} className={`seg-item${viewMode === m ? ' active' : ''}`}>
+              {m.charAt(0).toUpperCase() + m.slice(1)}
             </button>
           ))}
         </div>
 
+        {/* Date navigation */}
         {viewMode !== 'season' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={navigatePrev}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-              aria-label="Previous"
-            >
-              <ChevronLeft />
+          <div className="flex items-center justify-between">
+            <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: '#1C1C1E' }}>
+              <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
+                <path d="M8 2L2 8L8 14" stroke="#8E8E93" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
-            <span className="text-sm font-medium text-gray-700 min-w-[160px] text-center">
-              {periodLabel}
-            </span>
-            <button
-              onClick={navigateNext}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-              aria-label="Next"
-            >
-              <ChevronRight />
+            <span style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 600 }}>{periodLabel}</span>
+            <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: '#1C1C1E' }}>
+              <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
+                <path d="M2 2L8 8L2 14" stroke="#8E8E93" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
           </div>
         )}
-
         {viewMode === 'season' && (
-          <span className="text-sm font-medium text-gray-700">{periodLabel}</span>
+          <div className="text-center" style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 600 }}>{periodLabel}</div>
         )}
       </div>
 
       {/* Filters */}
-      {games.length > 0 && <FilterBar games={games} />}
+      {games.length > 0 && (
+        <div style={{ borderBottom: '0.5px solid #38383A' }}>
+          <FilterBar games={games} />
+        </div>
+      )}
 
-      {/* Games */}
+      {/* Game list */}
       {isLoading && !isInitialRange ? (
         <SkeletonList />
-      ) : groupedGames.length === 0 ? (
+      ) : grouped.length === 0 ? (
         <EmptyState hasFilters={!!(selectedTeam || selectedNetwork)} />
       ) : (
-        <div className="space-y-8">
-          {groupedGames.map(([date, dayGames]) => (
+        <div className="pb-8">
+          {grouped.map(([date, dayGames]) => (
             <MatchdayGroup key={date} date={date} games={dayGames} />
           ))}
         </div>
@@ -164,42 +135,26 @@ export function SchedulePage({ initialGames, initialStartDate, initialEndDate }:
 
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
   return (
-    <div className="text-center py-16 text-gray-400">
-      <div className="text-4xl mb-3">⚽</div>
-      <p className="text-sm">
-        {hasFilters ? 'No games match your filters' : 'No games scheduled for this period'}
-      </p>
+    <div className="flex flex-col items-center justify-center py-24 gap-3">
+      <span style={{ fontSize: 44 }}>⚽</span>
+      <span style={{ color: '#8E8E93', fontSize: 15 }}>
+        {hasFilters ? 'No games match your filters' : 'No games this period'}
+      </span>
     </div>
   );
 }
 
 function SkeletonList() {
   return (
-    <div className="space-y-8">
+    <div className="px-4 pt-4 space-y-4">
       {[0, 1].map((i) => (
-        <div key={i} className="space-y-2">
-          <div className="h-4 w-40 bg-gray-100 rounded animate-pulse" />
+        <div key={i} className="space-y-3">
+          <div className="h-4 w-24 rounded" style={{ background: '#2C2C2E' }} />
           {[0, 1, 2].map((j) => (
-            <div key={j} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
+            <div key={j} className="h-28 rounded-2xl" style={{ background: '#1C1C1E' }} />
           ))}
         </div>
       ))}
     </div>
-  );
-}
-
-function ChevronLeft() {
-  return (
-    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-    </svg>
-  );
-}
-
-function ChevronRight() {
-  return (
-    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
   );
 }
